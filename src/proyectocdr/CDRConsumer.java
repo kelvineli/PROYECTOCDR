@@ -1,13 +1,13 @@
 package proyectocdr;
+
 import javax.swing.SwingUtilities;
 import javax.swing.table.DefaultTableModel;
-import java.util.concurrent.atomic.AtomicLong;
 
 public class CDRConsumer implements Runnable {
     private final CDRQueue queue;
     private final DefaultTableModel modeloConsumidores;
-    private final AtomicLong consumedCount = new AtomicLong(0);
     private int totalMinutos = 0;
+    private int localCount = 0;
 
     public CDRConsumer(CDRQueue queue, DefaultTableModel modeloConsumidores) {
         this.queue = queue;
@@ -19,12 +19,16 @@ public class CDRConsumer implements Runnable {
         String me = Thread.currentThread().getName();
         String horaInicio = java.time.LocalTime.now().toString();
 
-        // Agregar fila en la tabla de consumidores
-        SwingUtilities.invokeLater(() -> {
-            modeloConsumidores.addRow(new Object[]{me, horaInicio, 0, 0});
-        });
+        //Usamos contenedor para guardar el índice de fila
+        final int[] rowIndex = new int[1];
 
         try {
+            // Insertar fila y capturar índice
+            SwingUtilities.invokeAndWait(() -> {
+                modeloConsumidores.addRow(new Object[]{me, horaInicio, 0, 0});
+                rowIndex[0] = modeloConsumidores.getRowCount() - 1;
+            });
+
             while (true) {
                 CDR cdr = queue.take();
                 if (cdr.poison) {
@@ -32,22 +36,29 @@ public class CDRConsumer implements Runnable {
                     break;
                 }
 
-                consumedCount.incrementAndGet();
+                // Actualizar métricas locales
+                localCount++;
                 totalMinutos += cdr.duracion;
 
-                long count = consumedCount.get();
-                int minutos = totalMinutos;
+                System.out.println("[" + me + "] procesó: " + cdr);
 
+                final int countFinal = localCount;
+                final int minutosFinal = totalMinutos;
+                final int row = rowIndex[0];
+
+                // Actualizar tabla
                 SwingUtilities.invokeLater(() -> {
-                    int lastRow = modeloConsumidores.getRowCount() - 1;
-                    modeloConsumidores.setValueAt(count, lastRow, 2);
-                    modeloConsumidores.setValueAt(minutos, lastRow, 3);
+                    modeloConsumidores.setValueAt(countFinal, row, 2);
+                    modeloConsumidores.setValueAt(minutosFinal, row, 3);
                 });
 
-                Thread.sleep(400); // Simula procesamiento
+                Thread.sleep(400); // simula tiempo de procesamiento
             }
+
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 }

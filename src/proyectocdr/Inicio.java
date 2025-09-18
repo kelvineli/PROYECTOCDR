@@ -2,12 +2,12 @@ package proyectocdr;
 
 import java.awt.*;
 import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.io.*;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 
 public class Inicio extends JFrame {
 
@@ -20,19 +20,19 @@ public class Inicio extends JFrame {
     private DefaultTableModel modeloConsumidores;
     private List<CDR> listaCDRs = new ArrayList<>();
 
-    // 🔹 Variable para guardar la ruta del archivo seleccionado
+    //Variable para guardar la ruta del archivo seleccionado
     private String rutaArchivo = null;
 
     public Inicio() {
 
-        // ----- Creación de Ventana -----
+        //Creación de Ventana
         setTitle("Procesamiento de CDR");
         setSize(800, 600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout(10, 10));
 
-        // ----- Panel superior: selección de archivo y ejecución de la lectura -----
+        //Panel superior selección de archivo y ejecución de la lectura
         JPanel panelArchivo = new JPanel(new FlowLayout(FlowLayout.LEFT));
         lblArchivo = new JLabel("Seleccione el archivo CSV con los CDR:");
         btnSeleccionarArchivo = new JButton("Seleccionar archivo");
@@ -42,7 +42,7 @@ public class Inicio extends JFrame {
         panelArchivo.add(btnSeleccionarArchivo);
         panelArchivo.add(btnIniciar);
 
-        // ----- Tablas -----
+        //Tablas
         String[] columnasProductores = {"ID Productor", "Hora de inicio", "Registros producidos"};
         modeloProductores = new DefaultTableModel(columnasProductores, 0);
         tablaProductores = new JTable(modeloProductores);
@@ -65,44 +65,93 @@ public class Inicio extends JFrame {
         add(panelSuperior, BorderLayout.NORTH);
         add(panelTablas, BorderLayout.CENTER);
 
+        // Acción para seleccionar archivo
+        btnSeleccionarArchivo.addActionListener((ActionEvent e) -> {
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setDialogTitle("Seleccionar archivo CSV");
 
-        btnSeleccionarArchivo.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                JFileChooser fileChooser = new JFileChooser();
-                fileChooser.setDialogTitle("Seleccionar archivo CSV");
-
-                int result = fileChooser.showOpenDialog(Inicio.this);
-                if (result == JFileChooser.APPROVE_OPTION) {
-                    File archivo = fileChooser.getSelectedFile();
-                    rutaArchivo = archivo.getAbsolutePath();
-                    lblArchivo.setText("Archivo seleccionado: " + rutaArchivo);
-                }
+            int result = fileChooser.showOpenDialog(Inicio.this);
+            if (result == JFileChooser.APPROVE_OPTION) {
+                File archivo = fileChooser.getSelectedFile();
+                rutaArchivo = archivo.getAbsolutePath();
+                lblArchivo.setText("Archivo seleccionado: " + rutaArchivo);
             }
         });
 
+        // Acción para iniciar procesamiento
+        btnIniciar.addActionListener((ActionEvent e) -> {
+            if (rutaArchivo == null) {
+                JOptionPane.showMessageDialog(Inicio.this,
+                        "Por favor seleccione un archivo CSV primero.",
+                        "Error", JOptionPane.ERROR_MESSAGE);
+            } else {
+                leerArchivoCSV(rutaArchivo);
 
-        btnIniciar.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                if (rutaArchivo == null) {
+                if (listaCDRs.isEmpty()) {
                     JOptionPane.showMessageDialog(Inicio.this,
-                            "Por favor seleccione un archivo CSV primero.",
+                            "El archivo no contiene registros válidos.",
                             "Error", JOptionPane.ERROR_MESSAGE);
-                } else {
-                    leerArchivoCSV(rutaArchivo);
+                    return;
                 }
+
+                //Configuración de hilos
+                final int QUEUE_CAP = 200;
+                final int N_PRODUCERS = 2;
+                final int N_CONSUMERS = 3;
+
+                CDRQueue queue = new CDRQueue(QUEUE_CAP);
+                CountDownLatch doneProducers = new CountDownLatch(N_PRODUCERS);
+
+                // Iniciar consumidores
+                for (int i = 0; i < N_CONSUMERS; i++) {
+                    Thread consumer = new Thread(new CDRConsumer(queue, modeloConsumidores), "C" + (i + 1));
+                    consumer.start();
+                }
+
+                // Dividir lista de CDRs entre productores
+                int total = listaCDRs.size();
+                int chunkSize = (int) Math.ceil((double) total / N_PRODUCERS);
+
+                for (int i = 0; i < N_PRODUCERS; i++) {
+                    int start = i * chunkSize;
+                    int end = Math.min(start + chunkSize, total);
+
+                    if (start >= end) break; // por si hay menos registros que productores
+
+                    List<CDR> subLista = listaCDRs.subList(start, end);
+
+                    Thread producer = new Thread(() -> {
+                        try {
+                            new CDRProducer(subLista, queue, modeloProductores).run();
+                        } finally {
+                            doneProducers.countDown();
+                        }
+                    }, "P" + (i + 1));
+                    producer.start();
+                }
+
+                // Hilo que espera a que terminen los productores
+                new Thread(() -> {
+                    try {
+                        doneProducers.await();
+                        for (int i = 0; i < N_CONSUMERS; i++) {
+                            queue.put(CDR.poison());
+                        }
+                        System.out.println("Todos los productores y consumidores finalizaron.");
+                    } catch (InterruptedException ex) {
+                        Thread.currentThread().interrupt();
+                    }
+                }).start();
             }
         });
     }
-
 
     private void leerArchivoCSV(String ruta) {
         listaCDRs.clear(); // limpiar lista antes de cargar nuevo archivo
         try (BufferedReader br = new BufferedReader(new FileReader(ruta))) {
             String linea;
             int contador = 0;
-            System.out.println("📂 Leyendo archivo: " + ruta);
+            System.out.println("Leyendo archivo: " + ruta);
             System.out.println("---------------------------------------------------");
 
             while ((linea = br.readLine()) != null) {
@@ -122,17 +171,15 @@ public class Inicio extends JFrame {
                                 partes[6]   // tipo
                         );
 
-                        // Agregar a la lista
                         listaCDRs.add(cdr);
 
-                        // Imprimir en consola usando el toString()
                         System.out.println("Línea " + contador + ": " + cdr);
 
                     } catch (NumberFormatException nfe) {
-                        System.out.println("⚠ Error en formato numérico en la línea " + contador + ": " + linea);
+                        System.out.println("Error en formato numérico en la línea " + contador + ": " + linea);
                     }
                 } else {
-                    System.out.println("⚠ Línea " + contador + " incompleta: " + linea);
+                    System.out.println("Línea " + contador + " incompleta: " + linea);
                 }
             }
 
@@ -147,5 +194,4 @@ public class Inicio extends JFrame {
                     "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
-
 }
