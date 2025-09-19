@@ -5,9 +5,9 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 public class DBManager {
-    private static final String URL = "jdbc:mysql://localhost:3306/cdrdb";
-    private static final String USER = "root";
-    private static final String PASSWORD = "sandia500";
+    private static final String URL = "jdbc:mysql://localhost:3306/cdrdb"; //VERIFICAR PUERTO
+    private static final String USER = "root"; //PONER AQUI USUARIO DE MYSQL
+    private static final String PASSWORD = "sandia500"; //PONER AQUI CONTRASEÑA DE USUARIO
 
     private static Connection conn;
 
