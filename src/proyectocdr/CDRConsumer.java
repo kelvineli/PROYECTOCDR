@@ -40,6 +40,10 @@ public class CDRConsumer implements Runnable {
                 localCount++;
                 totalMinutos += cdr.duracion;
 
+                // Procesar el CDR en la base de datos
+                DBManager.guardarCDR(cdr);
+                DBManager.actualizarResumen(cdr);
+
                 System.out.println("[" + me + "] procesó: " + cdr);
 
                 final int countFinal = localCount;

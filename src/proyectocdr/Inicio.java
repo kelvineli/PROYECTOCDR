@@ -19,6 +19,7 @@ public class Inicio extends JFrame {
     private DefaultTableModel modeloProductores;
     private DefaultTableModel modeloConsumidores;
     private List<CDR> listaCDRs = new ArrayList<>();
+    private JButton btnResultados;
 
     //Variable para guardar la ruta del archivo seleccionado
     private String rutaArchivo = null;
@@ -41,6 +42,14 @@ public class Inicio extends JFrame {
         panelArchivo.add(lblArchivo);
         panelArchivo.add(btnSeleccionarArchivo);
         panelArchivo.add(btnIniciar);
+
+        btnResultados = new JButton("Ver Resultados");
+        panelArchivo.add(btnResultados);
+
+        btnResultados.addActionListener((ActionEvent e) -> {
+            Resultados ventanaResultados = new Resultados();
+            ventanaResultados.setVisible(true);
+        });
 
         //Tablas
         String[] columnasProductores = {"ID Productor", "Hora de inicio", "Registros producidos"};
@@ -85,6 +94,14 @@ public class Inicio extends JFrame {
                         "Por favor seleccione un archivo CSV primero.",
                         "Error", JOptionPane.ERROR_MESSAGE);
             } else {
+
+                //Limpiar tablas de la interfaz
+                modeloProductores.setRowCount(0);
+                modeloConsumidores.setRowCount(0);
+
+                //Vaciar la BD
+                DBManager.limpiarTablas();
+
                 leerArchivoCSV(rutaArchivo);
 
                 if (listaCDRs.isEmpty()) {
@@ -187,7 +204,6 @@ public class Inicio extends JFrame {
             JOptionPane.showMessageDialog(this,
                     "Se leyeron " + contador + " líneas del archivo.\nTotal de objetos CDR almacenados: " + listaCDRs.size(),
                     "Lectura completa", JOptionPane.INFORMATION_MESSAGE);
-
         } catch (IOException ex) {
             JOptionPane.showMessageDialog(this,
                     "Error al leer el archivo: " + ex.getMessage(),
