@@ -56,7 +56,7 @@ public class CDRConsumer implements Runnable {
                     modeloConsumidores.setValueAt(minutosFinal, row, 3);
                 });
 
-                Thread.sleep(400); // simula tiempo de procesamiento
+                //Thread.sleep(400); // simula tiempo de procesamiento
             }
 
         } catch (InterruptedException e) {

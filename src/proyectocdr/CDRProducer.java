@@ -43,7 +43,7 @@ public class CDRProducer implements Runnable {
                     modeloProductores.setValueAt(countFinal, row, 2);
                 });
 
-                Thread.sleep(200);
+                //Thread.sleep(200);
             }
 
             System.out.printf("[%s] terminó con %d registros producidos.%n", me, localCount);
