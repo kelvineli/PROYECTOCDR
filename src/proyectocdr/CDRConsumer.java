@@ -32,7 +32,7 @@ public class CDRConsumer implements Runnable {
             while (true) {
                 CDR cdr = queue.take();
                 if (cdr.poison) {
-                    System.out.println("[" + me + "] terminó.");
+                    //System.out.println("[" + me + "] terminó.");
                     break;
                 }
 
@@ -44,7 +44,6 @@ public class CDRConsumer implements Runnable {
                 DBManager.guardarCDR(cdr);
                 DBManager.actualizarResumen(cdr);
 
-                System.out.println("[" + me + "] procesó: " + cdr);
 
                 final int countFinal = localCount;
                 final int minutosFinal = totalMinutos;

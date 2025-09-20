@@ -83,7 +83,7 @@ public class Inicio extends JFrame {
             if (result == JFileChooser.APPROVE_OPTION) {
                 File archivo = fileChooser.getSelectedFile();
                 rutaArchivo = archivo.getAbsolutePath();
-                lblArchivo.setText("Archivo seleccionado: " + rutaArchivo);
+                lblArchivo.setText("Archivo seleccionado: " + archivo.getName());
             }
         });
 
@@ -190,7 +190,7 @@ public class Inicio extends JFrame {
 
                         listaCDRs.add(cdr);
 
-                        System.out.println("Línea " + contador + ": " + cdr);
+                        //System.out.println("Línea " + contador + ": " + cdr);
 
                     } catch (NumberFormatException nfe) {
                         System.out.println("Error en formato numérico en la línea " + contador + ": " + linea);
